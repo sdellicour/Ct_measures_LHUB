@@ -124,16 +124,26 @@ for (i in 1:length(cts2_a))
 		if (is.null(cts2_b[[i]])) cts2_b[[i]] = NA
 	}
 
-date_ranges = list() # 1° division by epidemic phases:
+	# 1° division by epidemic phases:
+date_ranges = list(); date_names = list()
 date_ranges[[1]] = c("2020-03-01","2020-06-30")
 date_ranges[[2]] = c("2020-07-01","2020-08-31")
 date_ranges[[3]] = c("2020-09-01","2021-01-31")
 date_ranges[[4]] = c("2021-02-01","2021-04-30")
-date_ranges = list() # 2° division by epidemic phases:
+date_names[[1]] = c("01/03/2020","30/06/2020")
+date_names[[2]] = c("01/07/2020","31/08/2020")
+date_names[[3]] = c("01/09/2020","31/01/2021")
+date_names[[4]] = c("01/02/2021","15/05/2021")
+	# 2° division by epidemic phases:
+date_ranges = list(); date_names = list()
 date_ranges[[1]] = c("2020-03-01","2020-07-31")
 date_ranges[[2]] = c("2020-07-14","2020-09-01")
 date_ranges[[3]] = c("2020-09-01","2021-02-01")
 date_ranges[[4]] = c("2021-02-01","2021-05-15")
+date_names[[1]] = c("01/03/2020","31/07/2020")
+date_names[[2]] = c("14/07/2020","01/09/2020")
+date_names[[3]] = c("01/09/2020","01/02/2021")
+date_names[[4]] = c("01/02/2021","15/05/2021")
 load("Background_C_Faes.RData")
 weekend_correction = TRUE
 plottingDashedLines = FALSE
@@ -146,9 +156,17 @@ last_colour = colorRampPalette(brewer.pal(9,"Blues"))(66)[66]
 colour_scale = rev(c(colorRampPalette(brewer.pal(9,"Blues"))(66)[1:66],rep(last_colour,34)))
 colour_scale = rev(colorRampPalette(brewer.pal(9,"Blues"))(101)[1:101]) # original colour scale
 cols1 = colour_scale[(((vS-min(vS,na.rm=T))/(max(vS,na.rm=T)-min(vS,na.rm=T)))*100)+1]
+pchs1 = rep(16, length(vS)); pchs2 = rep(1, length(vS)); cexs1 = rep(1, length(vS))
+for (i in 2:length(vS))
+	{
+		if (((!is.na(vS[i]))&(!is.na(vS[i-1])))&&((vS[i-1]>vS[i])&(vS[i-1]>22.3)&(vS[i]<22.3)))
+			{
+				pchs1[i] = 17; pchs2[i] = 2; cexs1[i] = 1.5
+			}
+	}
 if (gap_Ct > 0) cols1 = c(rep(NA,gap_Ct), cols1) # to manually add a gap of minus 14 days on the Ct values
-if (usingMedianCtValues == TRUE) pdf("Figure_3_NEW.pdf", width=10, height=8)
-if (usingMedianCtValues != TRUE) pdf("Figure_S2_NEW.pdf", width=10, height=8)
+if (usingMedianCtValues == TRUE) pdf("Figure_C_NEW.pdf", width=10, height=8)
+if (usingMedianCtValues != TRUE) pdf("Figure_SC_NEW.pdf", width=10, height=8)
 par(mfrow=c(2,2), oma=c(1,1,0,0), mar=c(2.2,3.1,1,1), lwd=0.2, col="gray30")
 for (h in 1:length(date_ranges))
 	{
@@ -163,8 +181,8 @@ for (h in 1:length(date_ranges))
 			 tck=-0.015, mgp=c(0,0.5,0), col="gray30", col.tick="gray30", col.axis="gray30")
 		title(xlab="New hospitalisations", cex.lab=0.9, mgp=c(1.1,0,0), col.lab="gray30")
 		title(ylab="New hospitalisations daily ratio", cex.lab=0.9, mgp=c(2.3,0,0), col.lab="gray30")
-		mtext(date_ranges[[h]][1], line=-1.2, at=1.09, cex=0.7, col="gray30")
-		mtext(date_ranges[[h]][2], line=-2, at=1.09, cex=0.7, col="gray30")
+		mtext(date_names[[h]][1], line=-1.2, at=1.09, cex=0.7, col="gray30")
+		mtext(date_names[[h]][2], line=-2, at=1.09, cex=0.7, col="gray30")
 		if (plottingDashedLines == TRUE)
 			{
 				segments(0, 1, 1000, 1, lty="dashed", lwd=2)
@@ -210,19 +228,26 @@ for (h in 1:length(date_ranges))
 		dta_agg_s$size = dta_agg_s$TOTAL_IN_ICU/500
 		xaxis_seq = c(12.5,25,50,100,200,400,600)
 		yaxis_seq = seq(0.9,1.30,0.05); pos.date = c(1,1); cols2 = rep(NA, dim(dta_agg)[1])
+		pchs3 = c(); pchs4 = c(); cexs2 = c()
 		for (i in 1:dim(dta_agg_s)[1])
 			{
 				date = unlist(strsplit(as.character(dta_agg_s[i,"DATE"]),"-"))
 				date = paste(date[3],date[2],date[1],sep="/")
-				if (date%in%labels3) cols2[i] = cols1[which(labels3==date)]
+				if (date%in%labels3)
+					{
+						cols2[i] = cols1[which(labels3==date)]
+						pchs3[i] = pchs1[which(labels3==date)]
+						pchs4[i] = pchs2[which(labels3==date)]
+						cexs2[i] = cexs1[which(labels3==date)] 
+					}
 			}
 		lines(log10(dta_agg_s$new_in_mean), dta_agg_s$new_in_growth, lty=1, col="gray50", lwd=1)
 		for (i in 1:length(dta_agg_s$new_in_mean))
 			{
 				if (!is.na(cols2[i]))
 					{
-						points(log10(dta_agg_s$new_in_mean[i]), dta_agg_s$new_in_growth[i], pch=16, col=cols2[i], cex=1.0)
-						points(log10(dta_agg_s$new_in_mean[i]), dta_agg_s$new_in_growth[i], pch=1, col="gray30", cex=1.0)		
+						points(log10(dta_agg_s$new_in_mean[i]), dta_agg_s$new_in_growth[i], pch=pchs3[i], col=cols2[i], cex=cexs2[i])
+						points(log10(dta_agg_s$new_in_mean[i]), dta_agg_s$new_in_growth[i], pch=pchs4[i], col="gray30", cex=cexs2[i])		
 					}	else	{
 						points(log10(dta_agg_s$new_in_mean[i]), dta_agg_s$new_in_growth[i], pch=16, col="gray50", cex=0.6)
 					}
@@ -241,7 +266,7 @@ for (h in 1:length(date_ranges))
 	}
 dev.off()
 
-# 4. Plotting the median and mean Ct values through time
+# 3. Plotting the median and mean Ct values through time
 
 startingDay = 61; xS = startingDay:length(cases1); cols1 = list(); cols2 = list()
 cols1[[1]] = rgb(150,150,150,255,maxColorValue=255); cols2[[1]] = rgb(150,150,150,120,maxColorValue=255)
@@ -281,7 +306,7 @@ for (i in 1:length(events_1))
 		events_2[i] = which(decimal_date(dmy(gsub("\\/","-",labels3)))==events_1[i])
 	}
 
-pdf("Figure_2_NEW.pdf", width=9, height=6); par(mfrow=c(2,1), oma=c(0,0,0,0), mar=c(2.0,1.8,0.2,1.5), col="gray30", lwd=0.2)
+pdf("Figure_B_NEW.pdf", width=9, height=6); par(mfrow=c(2,1), oma=c(0,0,0,0), mar=c(2.0,1.8,0.2,1.5), col="gray30", lwd=0.2)
 slidingWindow = 14
 for (i in (slidingWindow+1):length(cases1))
 	{
@@ -307,6 +332,7 @@ axis(side=4, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.02, col.axis=cols1[[1]]
 lines(xS, unlist(cts2_b[startingDay:length(cases1)]), col=cols1[[2]], lwd=1.5, lty=2)
 lines(xS, unlist(cts2_b_low[startingDay:length(cases1)]), col=cols1[[2]], lwd=0.5, lty=3)
 lines(xS, unlist(cts2_b_high[startingDay:length(cases1)]), col=cols1[[2]], lwd=0.5, lty=3)
+abline(h=-22.3, col="red", lty=2, lwd=0.2)
 slidingWindow = 7
 for (i in (slidingWindow+1):length(cases1))
 	{
@@ -331,6 +357,7 @@ axis(side=4, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.02, col.axis=cols1[[1]]
 lines(xS, unlist(cts2_b[startingDay:length(cases1)]), col=cols1[[2]], lwd=1.5, lty=2)
 lines(xS, unlist(cts2_b_low[startingDay:length(cases1)]), col=cols1[[2]], lwd=0.5, lty=3)
 lines(xS, unlist(cts2_b_high[startingDay:length(cases1)]), col=cols1[[2]], lwd=0.5, lty=3)
+abline(h=-22.3, col="red", lty=2, lwd=0.2)
 dev.off()
 
 dev.new(width=2.3, height=2); par(oma=c(0,0,0,0), mar=c(1.0,1.0,0.2,0), col="gray30", lwd=0.2); slidingWindow = 14
@@ -384,4 +411,55 @@ plot(gaps, cors_b, axes=F, ann=F, type="l", col="gray30", lwd=0.7, lty=2); # poi
 lines(gaps, cors_a, col="gray30", lwd=0.7); points(gaps, cors_a, col="gray30", cex=0.5, pch=16)
 axis(side=1, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.03, col.axis="gray30", mgp=c(0,0.05,0), at=seq(0,35,5))
 axis(side=2, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.03, col.axis="gray30", mgp=c(0,0.25,0), at=seq(0.45,0.85,0.10))
+
+# 4. Generating the municipality maps (number of tests, positive cases)
+
+municipalities = shapefile("Shapefile_with_post_codes/Shapefile_NIS5_codes.shp")
+postCodes_NIS5 = read.csv("Shapefile_with_post_codes/Postal_codes_vs_NIS.csv", head=T)
+admins1 = raster::getData("GADM", country="BEL", level=1)
+brussels = subset(admins1, admins1@data[,"NAME_1"]=="Bruxelles")
+brussels = spTransform(brussels, crs(municipalities))
+sciensano = read.csv("Cumulated_cases_160521.csv")
+data = matrix(nrow=dim(municipalities@data)[1], ncol=4)
+colnames(data) = c("tests","positives","Ct_values","representativeness")
+sub1 = tab[which(tab[,"RSLT"]=="POS"),]
+sub2 = tab[which((tab[,"RSLT"]=="POS")&(grepl("M 2000 Real Time",tab[,"Analyseur"]))),]
+for (i in 1:dim(data)[1])	
+	{
+		nis5 = as.numeric(municipalities@data[i,"NISCode"])
+		post_codes = postCodes_NIS5[which(postCodes_NIS5[,"code_INS"]==nis5),"code_Postal"]
+		data[i,"tests"] = length(which(tab[,"CP"]%in%post_codes))
+		data[i,"positives"] = length(which(sub1[,"CP"]%in%post_codes))
+		data[i,"Ct_values"] = length(which(sub2[,"CP"]%in%post_codes))
+		data[i,"representativeness"] = data[i,"positives"]/sciensano[which(sciensano[,"NIS5"]==nis5),"CASES"]
+	}
+colour_scale_1 = c(colorRampPalette(brewer.pal(9,"YlOrBr"))(101))
+colour_scale_2 = c(colorRampPalette(brewer.pal(9,"YlOrBr"))(101))
+cols1 = colour_scale_1[((data[,"tests"]/max(data[,"tests"]))*100)+1]
+cols2 = colour_scale_2[((data[,"representativeness"]/max(data[,"representativeness"]))*100)+1]
+cols1[which(data[,"tests"]==0)] = "#E5E5E5"
+cols2[which(data[,"representativeness"]==0)] = "#E5E5E5"
+hospitals = matrix(nrow=4, ncol=2); colnames(hospitals) = c("longitude","latitude")
+hospitals[1,] = cbind(4.3454691, 50.8321104) # "Porte de Hal" site = CHU Saint-Pierre + J. Bordet Institute
+hospitals[2,] = cbind(4.2858909, 50.8058418) # "Anderlecht" site = Erasme Hospital
+hospitals[3,] = cbind(4.3331342, 50.8852662) # "Horta" site = CHU Brugmann
+hospitals[4,] = cbind(4.3844912, 50.8690991) # "Schaerbeek" site = CHU Brien
+hospitals = data.frame(lon=as.numeric(hospitals[,"longitude"]), lat=as.numeric(hospitals[,"latitude"]))
+coordinates(hospitals) = c("lon", "lat"); proj4string(hospitals) = CRS("+init=epsg:4326")
+hospitals = spTransform(hospitals, crs(municipalities)); plottingHospitals = FALSE
+
+pdf("Figure_A_NEW.pdf", width=10, height=4.1); par(mfrow=c(1,2), oma=c(0,0,0,0), mar=c(0,0,0,0), lwd=0.2, col="gray30")
+plot(municipalities, col=cols1, border="gray30", lwd=0.2); plot(brussels, col=NA, border="gray30", lwd=1.0, add=T)
+if (plottingHospitals == TRUE) points(hospitals, cex=0.9, pch=3, col="green3", lwd=1)
+mtext(paste0("Number of PCR tests performed by the LHUB"), cex=0.69, col="gray30", at=92000, line=-17.8)
+plot(raster(as.matrix(seq(0,max(data[,"tests"]),1))), legend.only=T, col=colour_scale_1[2:length(colour_scale_1)], legend.width=0.5, legend.shrink=0.3, 
+	 smallplot=c(0.05,0.5,0.100,0.115), alpha=1, horizontal=T, legend.args=list(text="", cex=0.7, line=0.5, col="gray30"), axis.args=list(cex.axis=0.7, 
+	 lwd=0, lwd.tick=0.2, tck=-0.9, col.axis="gray30", line=0, mgp=c(0,0.08,0)))
+plot(municipalities, col=cols2, border="gray30", lwd=0.2); plot(brussels, col=NA, border="gray30", lwd=1.0, add=T)
+if (plottingHospitals == TRUE) points(hospitals, cex=0.9, pch=3, col="green3", lwd=1)
+mtext(paste0("Representativeness of LHUB positive cases"), cex=0.69, col="gray30", at=92000, line=-17.8)
+plot(raster(as.matrix(seq(0,max(data[,"representativeness"]),0.001))), legend.only=T, col=colour_scale_2[2:length(colour_scale_2)], legend.width=0.5, legend.shrink=0.3,
+	 smallplot=c(0.05,0.5,0.100,0.115), alpha=1, horizontal=T, legend.args=list(text="", cex=0.7, line=0.5, col="gray30"), axis.args=list(cex.axis=0.7,
+	 lwd=0, lwd.tick=0.2, tck=-0.9, col.axis="gray30", line=0, mgp=c(0,0.08,0)))
+dev.off()
 
