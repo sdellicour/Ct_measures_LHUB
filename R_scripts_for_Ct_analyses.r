@@ -6,7 +6,7 @@ library("raster")
 library("RColorBrewer")
 library("zoo")
 
-tab = read.csv("Data_LUHB-ULB_200521.csv", head=T, sep=",")
+tab = read.csv("Data_LHUB-ULB_200521.csv", head=T, sep=",")
 
 # 1. Estimating the median and mean Ct values through time
 
@@ -21,17 +21,11 @@ bootstrapsCI = function(vS, type="median", conf.level=0.90, R=999)
 		return(median(vS)+quantile(differences, probs=c(0.5-(conf.level/2),0.5+(conf.level/2))))
 	}
 
-confidence_interval = FALSE; confidence_interval = TRUE
 dates = dmy(tab[,"Date.prelv"]); years = c(rep(2020,10), rep(2021,5))
 months = c("03","04","05","06","07","08","09","10","11","12","01","02","03","04","05")
-startDays = c(1, rep(1,length(months)-1))
+startDays = c(1, rep(1,length(months)-1)); n = 0
 endDays = c(31,30,31,30,31,31,30,31,30,31,31,28,31,30,15)
-labels1 = c(); labels2 = c(); labels3 = c()
-cases1 = list(); cases2 = list(); days = list(); n = 0
-cts1_a = list(); cts1_a_low = list(); cts1_a_high = list()
-cts1_b = list(); cts1_b_low = list(); cts1_b_high = list()
-cts2_a = list(); cts2_a_low = list(); cts2_a_high = list()
-cts2_b = list(); cts2_b_low = list(); cts2_b_high = list()
+labels1 = c(); labels2 = c(); labels3 = c(); labels4 = c()
 for (i in 1:length(months))
 	{
 		for (j in startDays[i]:endDays[i])
@@ -44,97 +38,45 @@ for (i in 1:length(months))
 					}
 				if (j < 10) j = paste0("0",j)
 				labels3 = c(labels3, paste(j,months[i],years[i],sep="/"))
-				date = dmy(paste(j,months[i],years[i],sep="/"))
-				sub = tab[which(dates==date),]; days[[n]] = date
-				indices = which(sub[,"RSLT"]=="POS"); cases1[[n]] = length(indices)
-				indices = which((sub[,"RSLT"]=="POS")&(grepl("M 2000 Real Time",sub[,"Analyseur"])))
-					# the other analysors did not lead to comparable Ct values
-				vS = sub[indices,"Ct"]
-				cts1_a[[n]] = median(vS, na.rm=T)
-				if (length(vS) > 0)
+			}
+	}
+labels4 = dmy(gsub("\\/","-",labels3)); days = list()
+slidingWindow = 14; cases1 = list(); cases2 = list()
+cts_a = list(); cts_a_low = list(); cts_a_high = list()
+cts_b = list(); cts_b_low = list(); cts_b_high = list()
+for (i in 1:length(labels4))
+	{
+		indices = which(dates==labels4[i]); sub = tab[indices,]
+		indices = which(sub[,"RSLT"]=="POS"); cases1[[i]] = length(indices)
+		startDay = labels4[i]-slidingWindow
+		indices = which((startDay<=dates)&(dates<=labels4[i]))
+		if (length(indices) == 0)
+			{
+				cts_a[[i]] = NA; cts_a_low[[i]] = NA; cts_a_high[[i]] = NA
+				cts_b[[i]] = NA; cts_b_low[[i]] = NA; cts_b_high[[i]] = NA
+			}	else	{
+				sub = tab[indices,]; indices = which((sub[,"RSLT"]=="POS")&(grepl("M 2000 Real Time",sub[,"Analyseur"])))
+				vS = sub[indices,"Ct"]; cts_a[[i]] = median(vS, na.rm=T); cts_b[[i]] = mean(vS, na.rm=T)
+				if (sum(!is.na(vS)) > 1)
 					{
-						if (confidence_interval == TRUE)
-							{
-								if (sum(!is.na(vS)) > 1)
-									{
-										ci = MedianCI(vS, conf.level=0.90, sides="two.sided", na.rm=T, method="boot", R=999)
-										cts1_a_low[[n]] = ci["lwr.ci"]; cts1_a_high[[n]] = ci["upr.ci"]
-										ci = bootstrapsCI(vS, type="median", conf.level=0.90, R=999)
-										cts1_a_low[[n]] = ci[1]; cts1_a_high[[n]] = ci[2]
-									}	else		{
-										cts1_a_low[[n]] = NA; cts1_a_high[[n]] = NA
-									}
-							}	else	{		
-								if (sum(!is.na(cts1_a[[n]])) > 0)
-									{
-										cts1_a_low[[n]] = quantile(vS, 0.25, na.rm=T)
-										cts1_a_high[[n]] = quantile(vS, 0.75, na.rm=T)
-									}	else	{
-										cts1_a_low[[n]] = NA; cts1_a_high[[n]] = NA
-									}
-							}
+						ci = bootstrapsCI(vS, type="median", conf.level=0.95, R=999)
+						cts_a_low[[i]] = ci[1]; cts_a_high[[i]] = ci[2]
+						ci = bootstrapsCI(vS, type="mean", conf.level=0.95, R=999)
+						cts_b_low[[i]] = ci[1]; cts_b_high[[i]] = ci[2]
 					}	else		{
-						cts1_a_low[[n]] = NA; cts1_a_high[[n]] = NA
-					}
-				cts1_b[[n]] = mean(vS, na.rm=T)
-				if (length(vS) > 0)
-					{
-						if (confidence_interval == TRUE)
-							{
-								if (sum(!is.na(vS)) > 1)
-									{
-										ci = MeanCI(vS, conf.level=0.90, sides="two.sided", na.rm=T, method="boot", R=999)
-										cts1_b_low[[n]] = ci["lwr.ci"]; cts1_b_high[[n]] = ci["upr.ci"]
-										ci = bootstrapsCI(vS, type="mean", conf.level=0.90, R=999)
-										cts1_b_low[[n]] = ci[1]; cts1_b_high[[n]] = ci[2]
-									}	else		{
-										cts1_b_low[[n]] = NA; cts1_b_high[[n]] = NA
-									}
-							}	else	{
-								if (sum(!is.na(cts1_a[[n]])) > 0)
-									{
-										cts1_b_low[[n]] = quantile(vS, 0.25, na.rm=T)
-										cts1_b_high[[n]] = quantile(vS, 0.75, na.rm=T)
-									}	else	{
-										cts1_b_low[[n]] = NA; cts1_b_high[[n]] = NA
-									}
-							}
-					}	else		{
-						cts1_b_low[[n]] = NA; cts1_b_high[[n]] = NA
+						cts_a_low[[i]] = NA; cts_a_high[[i]] = NA; cts_b_low[[i]] = NA; cts_b_high[[i]] = NA
 					}
 			}
+	}
+for (i in 1:length(cases1))
+	{
+		interval = slidingWindow
+		if ((i-slidingWindow) < 1) interval = 0
+		cases2[[i]] = mean(unlist(cases1[(i-interval):i]), na.rm=T)
 	}
 
 # 2. Co-plotting the mean Ct values on GEES phase diagrams
 
-slidingWindow = 14; gap_Ct = 0
-for (i in (slidingWindow+1):length(cases1))
-	{
-		cases2[[i]] = mean(unlist(cases1[(i-slidingWindow):i]), na.rm=T)
-		cts2_a[[i]] = -mean(unlist(cts1_a[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_low[[i]] = -mean(unlist(cts1_a_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_high[[i]] = -mean(unlist(cts1_a_high[(i-slidingWindow):i]), na.rm=T)
-		cts2_b[[i]] = -mean(unlist(cts1_b[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_low[[i]] = -mean(unlist(cts1_b_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_high[[i]] = -mean(unlist(cts1_b_high[(i-slidingWindow):i]), na.rm=T)
-	}
-for (i in 1:length(cts2_a))
-	{
-		if (is.null(cts2_a[[i]])) cts2_a[[i]] = NA
-		if (is.null(cts2_b[[i]])) cts2_b[[i]] = NA
-	}
-
-	# 1° division by epidemic phases:
-date_ranges = list(); date_names = list()
-date_ranges[[1]] = c("2020-03-01","2020-06-30")
-date_ranges[[2]] = c("2020-07-01","2020-08-31")
-date_ranges[[3]] = c("2020-09-01","2021-01-31")
-date_ranges[[4]] = c("2021-02-01","2021-04-30")
-date_names[[1]] = c("01/03/2020","30/06/2020")
-date_names[[2]] = c("01/07/2020","31/08/2020")
-date_names[[3]] = c("01/09/2020","31/01/2021")
-date_names[[4]] = c("01/02/2021","15/05/2021")
-	# 2° division by epidemic phases:
 date_ranges = list(); date_names = list()
 date_ranges[[1]] = c("2020-03-01","2020-07-31")
 date_ranges[[2]] = c("2020-07-14","2020-09-01")
@@ -149,9 +91,10 @@ weekend_correction = TRUE
 plottingDashedLines = FALSE
 usingMedianCtValues = FALSE
 usingMedianCtValues = TRUE
+gap_Ct = 0
 
-if (usingMedianCtValues == TRUE) vS = -unlist(cts2_a)
-if (usingMedianCtValues != TRUE) vS = -unlist(cts2_b)
+if (usingMedianCtValues == TRUE) vS = unlist(cts_a)
+if (usingMedianCtValues != TRUE) vS = unlist(cts_b)
 last_colour = colorRampPalette(brewer.pal(9,"Blues"))(66)[66]
 colour_scale = rev(c(colorRampPalette(brewer.pal(9,"Blues"))(66)[1:66],rep(last_colour,34)))
 colour_scale = rev(colorRampPalette(brewer.pal(9,"Blues"))(101)[1:101]) # original colour scale
@@ -165,6 +108,7 @@ for (i in 2:length(vS))
 			}
 	}
 if (gap_Ct > 0) cols1 = c(rep(NA,gap_Ct), cols1) # to manually add a gap of minus 14 days on the Ct values
+
 if (usingMedianCtValues == TRUE) pdf("Figure_C_NEW.pdf", width=10, height=8)
 if (usingMedianCtValues != TRUE) pdf("Figure_SC_NEW.pdf", width=10, height=8)
 par(mfrow=c(2,2), oma=c(1,1,0,0), mar=c(2.2,3.1,1,1), lwd=0.2, col="gray30")
@@ -261,14 +205,14 @@ for (h in 1:length(date_ranges))
 				plot(legendRast, legend.only=T, col=rev(colour_scale), legend.width=0.5, legend.shrink=0.3,
 					 smallplot=c(0.88,0.89,0.60,0.92), alpha=1, horizontal=F, legend.args=list(text="", cex=0.7, line=0.5, col="gray10"),
 					 axis.args=list(cex.axis=0.8, lwd=0, lwd.tick=0.3, tck=-1.2, col.axis="gray10", col.tick="gray10", line=0, mgp=c(0,0.5,0),
-					 at=seq(-14,-24,-2), labels=seq(14,24,2)))
+					 at=seq(-14,-26,-2), labels=seq(14,26,2)))
 			}
 	}
 dev.off()
 
 # 3. Plotting the median and mean Ct values through time
 
-startingDay = 61; xS = startingDay:length(cases1); cols1 = list(); cols2 = list()
+startingDay = 61; xS = startingDay:length(cases2); cols1 = list(); cols2 = list()
 cols1[[1]] = rgb(150,150,150,255,maxColorValue=255); cols2[[1]] = rgb(150,150,150,120,maxColorValue=255)
 cols1[[2]] = rgb(222,67,39,255,maxColorValue=255); cols2[[2]] = rgb(222,67,39,150,maxColorValue=255); cols1[[3]] = "green3"
 events_1 = decimal_date(dmy(c("10-05-2020","11-05-2020","18-05-2020","08-06-2020","01-07-2020","03-07-2020","29-07-2020",
@@ -307,71 +251,25 @@ for (i in 1:length(events_1))
 	}
 
 pdf("Figure_B_NEW.pdf", width=9, height=6); par(mfrow=c(2,1), oma=c(0,0,0,0), mar=c(2.0,1.8,0.2,1.5), col="gray30", lwd=0.2)
-slidingWindow = 14
-for (i in (slidingWindow+1):length(cases1))
-	{
-		cases2[[i]] = mean(unlist(cases1[(i-slidingWindow):i]), na.rm=T)
-		cts2_a[[i]] = -mean(unlist(cts1_a[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_low[[i]] = -mean(unlist(cts1_a_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_high[[i]] = -mean(unlist(cts1_a_high[(i-slidingWindow):i]), na.rm=T)
-		cts2_b[[i]] = -mean(unlist(cts1_b[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_low[[i]] = -mean(unlist(cts1_b_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_high[[i]] = -mean(unlist(cts1_b_high[(i-slidingWindow):i]), na.rm=T)
-	}
-plot(xS, unlist(cases2[startingDay:length(cases1)]), col=NA, lwd=0.5, type="l", axes=F, ann=F, xlim=c(min(xS),max(xS)))
-yy_l = c(rep(0,length(xS)),rev(unlist(cases2[startingDay:length(cases1)])))
+plot(xS, unlist(cases2[startingDay:length(cases2)]), col=NA, lwd=0.5, type="l", axes=F, ann=F, xlim=c(min(xS),max(xS)))
+yy_l = c(rep(0,length(xS)),rev(unlist(cases2[startingDay:length(cases2)])))
 xx_l = c(xS,rev(xS)); polygon(xx_l, yy_l, col=cols2[[1]], border=0)
 for (i in 1:length(events_2)) abline(v=events_2[i], col="gray50", lwd=0.7, lty=2)
 axis(side=1, lwd.tick=0.2, cex.axis=0.6, lwd=0.2, tck=-0.02, col.axis="gray30", mgp=c(0,0.03,0), at=labels1, labels=labels2)
 axis(side=2, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.02, col.axis="gray30", mgp=c(0,0.20,0), at=seq(0,200,50), pos=labels1[3]-3)
-par(new=T); yMin = min(c(unlist(cts2_a_low),unlist(cts2_a_high)), na.rm=T); yMax = max(c(unlist(cts2_a_low),unlist(cts2_a_high)), na.rm=T)
-plot(xS, unlist(cts2_a[startingDay:length(cases1)]), col=cols1[[2]], lwd=1.5, type="l", axes=F, ann=F, xlim=c(min(xS),max(xS)), ylim=c(-30,-8))
-yy_l = c(rep(unlist(cts2_a_high[startingDay:length(cases1)])),rev(unlist(cts2_a_low[startingDay:length(cases1)])))
+par(new=T); yMin = min(c(unlist(cts_a_low),unlist(cts_a_high)), na.rm=T); yMax = max(c(unlist(cts_a_low),unlist(cts_a_high)), na.rm=T)
+plot(xS, -unlist(cts_a[startingDay:length(cases2)]), col=cols1[[2]], lwd=1.5, type="l", axes=F, ann=F, xlim=c(min(xS),max(xS)), ylim=c(-30,-8))
+yy_l = c(rep(-unlist(cts_a_high[startingDay:length(cases2)])),rev(-unlist(cts_a_low[startingDay:length(cases2)])))
 xx_l = c(xS,rev(xS)); polygon(xx_l, yy_l, col=cols2[[2]], border=0)
 axis(side=4, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.02, col.axis=cols1[[1]], mgp=c(0,0.10,0), at=seq(-40,0,5), labels=seq(40,0,-5))
-lines(xS, unlist(cts2_b[startingDay:length(cases1)]), col=cols1[[2]], lwd=1.5, lty=2)
-lines(xS, unlist(cts2_b_low[startingDay:length(cases1)]), col=cols1[[2]], lwd=0.5, lty=3)
-lines(xS, unlist(cts2_b_high[startingDay:length(cases1)]), col=cols1[[2]], lwd=0.5, lty=3)
-abline(h=-22.3, col="red", lty=2, lwd=0.2)
-slidingWindow = 7
-for (i in (slidingWindow+1):length(cases1))
-	{
-		cases2[[i]] = mean(unlist(cases1[(i-slidingWindow):i]), na.rm=T)
-		cts2_a[[i]] = -mean(unlist(cts1_a[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_low[[i]] = -mean(unlist(cts1_a_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_high[[i]] = -mean(unlist(cts1_a_high[(i-slidingWindow):i]), na.rm=T)
-		cts2_b[[i]] = -mean(unlist(cts1_b[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_low[[i]] = -mean(unlist(cts1_b_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_high[[i]] = -mean(unlist(cts1_b_high[(i-slidingWindow):i]), na.rm=T)
-	}
-plot(xS, unlist(cases2[startingDay:length(cases1)]), col=NA, lwd=0.5, type="l", axes=F, ann=F, xlim=c(min(xS),max(xS)))
-yy_l = c(rep(0,length(xS)),rev(unlist(cases2[startingDay:length(cases1)])))
-xx_l = c(xS,rev(xS)); polygon(xx_l, yy_l, col=cols2[[1]], border=0)
-axis(side=1, lwd.tick=0.2, cex.axis=0.6, lwd=0.2, tck=-0.02, col.axis="gray30", mgp=c(0,0.03,0), at=labels1, labels=labels2)
-axis(side=2, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.02, col.axis="gray30", mgp=c(0,0.20,0), at=seq(0,200,50), pos=labels1[3]-3)
-par(new=T); yMin = min(c(unlist(cts2_a_low),unlist(cts2_a_high)), na.rm=T); yMax = max(c(unlist(cts2_a_low),unlist(cts2_a_high)), na.rm=T)
-plot(xS, unlist(cts2_a[startingDay:length(cases1)]), col=cols1[[2]], lwd=1.5, type="l", axes=F, ann=F, xlim=c(min(xS),max(xS)), ylim=c(-30,-8))
-yy_l = c(rep(unlist(cts2_a_high[startingDay:length(cases1)])),rev(unlist(cts2_a_low[startingDay:length(cases1)])))
-xx_l = c(xS,rev(xS)); polygon(xx_l, yy_l, col=cols2[[2]], border=0)
-axis(side=4, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.02, col.axis=cols1[[1]], mgp=c(0,0.10,0), at=seq(-40,0,5), labels=seq(40,0,-5))
-lines(xS, unlist(cts2_b[startingDay:length(cases1)]), col=cols1[[2]], lwd=1.5, lty=2)
-lines(xS, unlist(cts2_b_low[startingDay:length(cases1)]), col=cols1[[2]], lwd=0.5, lty=3)
-lines(xS, unlist(cts2_b_high[startingDay:length(cases1)]), col=cols1[[2]], lwd=0.5, lty=3)
+lines(xS, -unlist(cts_b[startingDay:length(cases2)]), col=cols1[[2]], lwd=1.5, lty=2)
+lines(xS, -unlist(cts_b_low[startingDay:length(cases2)]), col=cols1[[2]], lwd=0.5, lty=3)
+lines(xS, -unlist(cts_b_high[startingDay:length(cases2)]), col=cols1[[2]], lwd=0.5, lty=3)
 abline(h=-22.3, col="red", lty=2, lwd=0.2)
 dev.off()
 
-dev.new(width=2.3, height=2); par(oma=c(0,0,0,0), mar=c(1.0,1.0,0.2,0), col="gray30", lwd=0.2); slidingWindow = 14
-for (i in (slidingWindow+1):length(cases1))
-	{
-		cases2[[i]] = mean(unlist(cases1[(i-slidingWindow):i]), na.rm=T)
-		cts2_a[[i]] = -mean(unlist(cts1_a[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_low[[i]] = -mean(unlist(cts1_a_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_high[[i]] = -mean(unlist(cts1_a_high[(i-slidingWindow):i]), na.rm=T)
-		cts2_b[[i]] = -mean(unlist(cts1_b[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_low[[i]] = -mean(unlist(cts1_b_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_high[[i]] = -mean(unlist(cts1_b_high[(i-slidingWindow):i]), na.rm=T)
-	}
-mat = cbind(unlist(cases2), unlist(cts2_a), unlist(cts2_b)); gaps = seq(0,30)
+dev.new(width=2.3, height=2); par(oma=c(0,0,0,0), mar=c(1.0,1.0,0.2,0), col="gray30", lwd=0.2)
+mat = cbind(unlist(cases2), -unlist(cts_a), -unlist(cts_b)); gaps = seq(0,30)
 cors_a = rep(NA, length(gaps)); cors_b = rep(NA, length(gaps))
 for (i in 1:length(gaps))
 	{
@@ -385,81 +283,4 @@ plot(gaps, cors_b, axes=F, ann=F, type="l", col="gray30", lwd=0.7, lty=2); # poi
 lines(gaps, cors_a, col="gray30", lwd=0.7); points(gaps, cors_a, col="gray30", cex=0.5, pch=16)
 axis(side=1, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.03, col.axis="gray30", mgp=c(0,0.05,0), at=seq(0,35,5))
 axis(side=2, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.03, col.axis="gray30", mgp=c(0,0.25,0), at=seq(0.45,0.85,0.10))
-
-dev.new(width=2.3, height=2); par(oma=c(0,0,0,0), mar=c(1.0,1.0,0.2,0), col="gray30", lwd=0.2); slidingWindow = 7
-for (i in (slidingWindow+1):length(cases1))
-	{
-		cases2[[i]] = mean(unlist(cases1[(i-slidingWindow):i]), na.rm=T)
-		cts2_a[[i]] = -mean(unlist(cts1_a[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_low[[i]] = -mean(unlist(cts1_a_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_a_high[[i]] = -mean(unlist(cts1_a_high[(i-slidingWindow):i]), na.rm=T)
-		cts2_b[[i]] = -mean(unlist(cts1_b[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_low[[i]] = -mean(unlist(cts1_b_low[(i-slidingWindow):i]), na.rm=T)
-		cts2_b_high[[i]] = -mean(unlist(cts1_b_high[(i-slidingWindow):i]), na.rm=T)
-	}
-mat = cbind(unlist(cases2), unlist(cts2_a), unlist(cts2_b)); gaps = seq(0,30)
-cors_a = rep(NA, length(gaps)); cors_b = rep(NA, length(gaps))
-for (i in 1:length(gaps))
-	{
-		indices1 = startingDay:(dim(mat)[1]-gaps[i]); indices2 = (startingDay+gaps[i]):dim(mat)[1]
-		tmp = cbind(mat[indices1,2], mat[indices2,1]); tmp = tmp[which((!is.na(tmp[,1]))&(!is.na(tmp[,2]))),]
-		cors_a[i] = cor(tmp[,2], tmp[,1], method="spearman")
-		tmp = cbind(mat[indices1,3], mat[indices2,1]); tmp = tmp[which((!is.na(tmp[,1]))&(!is.na(tmp[,2]))),]
-		cors_b[i] = cor(tmp[,2], tmp[,1], method="spearman") 
-	}
-plot(gaps, cors_b, axes=F, ann=F, type="l", col="gray30", lwd=0.7, lty=2); # points(gaps, cors_b, col="gray30", cex=0.5, pch=16)
-lines(gaps, cors_a, col="gray30", lwd=0.7); points(gaps, cors_a, col="gray30", cex=0.5, pch=16)
-axis(side=1, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.03, col.axis="gray30", mgp=c(0,0.05,0), at=seq(0,35,5))
-axis(side=2, lwd.tick=0.2, cex.axis=0.7, lwd=0.2, tck=-0.03, col.axis="gray30", mgp=c(0,0.25,0), at=seq(0.45,0.85,0.10))
-
-# 4. Generating the municipality maps (number of tests, positive cases)
-
-municipalities = shapefile("Shapefile_with_post_codes/Shapefile_NIS5_codes.shp")
-postCodes_NIS5 = read.csv("Shapefile_with_post_codes/Postal_codes_vs_NIS.csv", head=T)
-admins1 = raster::getData("GADM", country="BEL", level=1)
-brussels = subset(admins1, admins1@data[,"NAME_1"]=="Bruxelles")
-brussels = spTransform(brussels, crs(municipalities))
-sciensano = read.csv("Cumulated_cases_160521.csv")
-data = matrix(nrow=dim(municipalities@data)[1], ncol=4)
-colnames(data) = c("tests","positives","Ct_values","representativeness")
-sub1 = tab[which(tab[,"RSLT"]=="POS"),]
-sub2 = tab[which((tab[,"RSLT"]=="POS")&(grepl("M 2000 Real Time",tab[,"Analyseur"]))),]
-for (i in 1:dim(data)[1])	
-	{
-		nis5 = as.numeric(municipalities@data[i,"NISCode"])
-		post_codes = postCodes_NIS5[which(postCodes_NIS5[,"code_INS"]==nis5),"code_Postal"]
-		data[i,"tests"] = length(which(tab[,"CP"]%in%post_codes))
-		data[i,"positives"] = length(which(sub1[,"CP"]%in%post_codes))
-		data[i,"Ct_values"] = length(which(sub2[,"CP"]%in%post_codes))
-		data[i,"representativeness"] = data[i,"positives"]/sciensano[which(sciensano[,"NIS5"]==nis5),"CASES"]
-	}
-colour_scale_1 = c(colorRampPalette(brewer.pal(9,"YlOrBr"))(101))
-colour_scale_2 = c(colorRampPalette(brewer.pal(9,"YlOrBr"))(101))
-cols1 = colour_scale_1[((data[,"tests"]/max(data[,"tests"]))*100)+1]
-cols2 = colour_scale_2[((data[,"representativeness"]/max(data[,"representativeness"]))*100)+1]
-cols1[which(data[,"tests"]==0)] = "#E5E5E5"
-cols2[which(data[,"representativeness"]==0)] = "#E5E5E5"
-hospitals = matrix(nrow=4, ncol=2); colnames(hospitals) = c("longitude","latitude")
-hospitals[1,] = cbind(4.3454691, 50.8321104) # "Porte de Hal" site = CHU Saint-Pierre + J. Bordet Institute
-hospitals[2,] = cbind(4.2858909, 50.8058418) # "Anderlecht" site = Erasme Hospital
-hospitals[3,] = cbind(4.3331342, 50.8852662) # "Horta" site = CHU Brugmann
-hospitals[4,] = cbind(4.3844912, 50.8690991) # "Schaerbeek" site = CHU Brien
-hospitals = data.frame(lon=as.numeric(hospitals[,"longitude"]), lat=as.numeric(hospitals[,"latitude"]))
-coordinates(hospitals) = c("lon", "lat"); proj4string(hospitals) = CRS("+init=epsg:4326")
-hospitals = spTransform(hospitals, crs(municipalities)); plottingHospitals = FALSE
-
-pdf("Figure_A_NEW.pdf", width=10, height=4.1); par(mfrow=c(1,2), oma=c(0,0,0,0), mar=c(0,0,0,0), lwd=0.2, col="gray30")
-plot(municipalities, col=cols1, border="gray30", lwd=0.2); plot(brussels, col=NA, border="gray30", lwd=1.0, add=T)
-if (plottingHospitals == TRUE) points(hospitals, cex=0.9, pch=3, col="green3", lwd=1)
-mtext(paste0("Number of PCR tests performed by the LHUB"), cex=0.69, col="gray30", at=92000, line=-17.8)
-plot(raster(as.matrix(seq(0,max(data[,"tests"]),1))), legend.only=T, col=colour_scale_1[2:length(colour_scale_1)], legend.width=0.5, legend.shrink=0.3, 
-	 smallplot=c(0.05,0.5,0.100,0.115), alpha=1, horizontal=T, legend.args=list(text="", cex=0.7, line=0.5, col="gray30"), axis.args=list(cex.axis=0.7, 
-	 lwd=0, lwd.tick=0.2, tck=-0.9, col.axis="gray30", line=0, mgp=c(0,0.08,0)))
-plot(municipalities, col=cols2, border="gray30", lwd=0.2); plot(brussels, col=NA, border="gray30", lwd=1.0, add=T)
-if (plottingHospitals == TRUE) points(hospitals, cex=0.9, pch=3, col="green3", lwd=1)
-mtext(paste0("Representativeness of LHUB positive cases"), cex=0.69, col="gray30", at=92000, line=-17.8)
-plot(raster(as.matrix(seq(0,max(data[,"representativeness"]),0.001))), legend.only=T, col=colour_scale_2[2:length(colour_scale_2)], legend.width=0.5, legend.shrink=0.3,
-	 smallplot=c(0.05,0.5,0.100,0.115), alpha=1, horizontal=T, legend.args=list(text="", cex=0.7, line=0.5, col="gray30"), axis.args=list(cex.axis=0.7,
-	 lwd=0, lwd.tick=0.2, tck=-0.9, col.axis="gray30", line=0, mgp=c(0,0.08,0)))
-dev.off()
 
