@@ -8,7 +8,7 @@ The Ct data are all gathered in the file "Data_LHUB-ULB_200521.csv". The R scrip
 
 (3) plotting the median and mean Ct values through time
 
-(*) the phase diagrams are generated according to Hens et al. (2021, Archives of Public Health)
+(*) the phase diagrams are generated according to Hens *et al**. (2021, *Archives of Public Health**)
 
 In addition, we also gathered within the subdirectory "Ct_values_Analyses_by_age" the R script and files required to run specific analyses by age category.
 
