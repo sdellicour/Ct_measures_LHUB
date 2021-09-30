@@ -1,8 +1,11 @@
 This repo gathers all the input files and scripts related to our study entitled "Leveraging of SARS-CoV-2 PCR cycle thresholds values (Ct) to forecast COVID-19 trends" (Yin *et al*. *submitted*): R script to prepare, analyse, and visualise the Ct data.
 
 The Ct data are all gathered in the file "Data_LHUB-ULB_200521.csv". The R script "R_scripts_for_Ct_analyses.r" is divided into different sections allowing to perform the following analytical steps:
+
 (1) estimating the median and mean Ct values through time
+
 (2) co-plotting the mean Ct values on phase diagrams*
+
 (3) plotting the median and mean Ct values through time
 
 (*) the phase diagrams are generated according to Hens et al. (2021, Archives of Public Health)
